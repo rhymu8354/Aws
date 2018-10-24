@@ -35,8 +35,8 @@ namespace Aws {
         canonicalRequest << request->method << "\n";
 
         // Step 2
-        Uri::Uri requestPath;
-        requestPath.SetPath(request->target.GetPath());
+        Uri::Uri basePath;
+        auto requestPath = basePath.Resolve(request->target);
         canonicalRequest << requestPath.GenerateString() << "\n";
 
         // Step 3
