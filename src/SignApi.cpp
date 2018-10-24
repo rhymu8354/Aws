@@ -41,7 +41,13 @@ namespace Aws {
         canonicalRequest << requestPath.GenerateString() << "\n";
 
         // Step 3
-        auto parametersString = SystemAbstractions::Split(request->target.GetQuery(), '&');
+        Uri::Uri requestQuery(request->target);
+        requestQuery.SetPath({});
+        auto requestQueryEncoded = requestQuery.GenerateString();
+        if (requestQueryEncoded.length() > 0) {
+            requestQueryEncoded = requestQueryEncoded.substr(1);
+        }
+        auto parametersString = SystemAbstractions::Split(requestQueryEncoded, '&');
         struct Parameter {
             std::string name;
             std::string value;
