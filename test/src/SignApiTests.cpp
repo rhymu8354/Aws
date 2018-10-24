@@ -164,7 +164,79 @@ TEST_F(SignApiTests, MakeCanonicalRequest) {
 }
 
 TEST_F(SignApiTests, MakeStringToSign) {
+    static const std::string region = "us-east-1";
+    static const std::string service = "service";
+    for (const auto& testVector: testVectors) {
+        SystemAbstractions::File creqFile(testVector.substr(0, testVector.length() - 3) + "creq");
+        ASSERT_TRUE(creqFile.Open());
+        SystemAbstractions::File::Buffer creqContents(creqFile.GetSize());
+        ASSERT_EQ(creqFile.GetSize(), creqFile.Read(creqContents));
+        SystemAbstractions::File stsFile(testVector.substr(0, testVector.length() - 3) + "sts");
+        ASSERT_TRUE(stsFile.Open());
+        SystemAbstractions::File::Buffer stsContents(stsFile.GetSize());
+        ASSERT_EQ(stsFile.GetSize(), stsFile.Read(stsContents));
+        EXPECT_EQ(
+            std::string(stsContents.begin(), stsContents.end()),
+            Aws::SignApi::MakeStringToSign(
+                region,
+                service,
+                std::string(creqContents.begin(), creqContents.end())
+            )
+        ) << "******** The name of the test vector that failed was: " << GetFileNameOnly(testVector);
+    }
 }
 
 TEST_F(SignApiTests, MakeAuthorization) {
+    for (const auto& testVector: testVectors) {
+        SystemAbstractions::File creqFile(testVector.substr(0, testVector.length() - 3) + "creq");
+        ASSERT_TRUE(creqFile.Open());
+        SystemAbstractions::File::Buffer creqContents(creqFile.GetSize());
+        ASSERT_EQ(creqFile.GetSize(), creqFile.Read(creqContents));
+        SystemAbstractions::File stsFile(testVector.substr(0, testVector.length() - 3) + "sts");
+        ASSERT_TRUE(stsFile.Open());
+        SystemAbstractions::File::Buffer stsContents(stsFile.GetSize());
+        ASSERT_EQ(stsFile.GetSize(), stsFile.Read(stsContents));
+        SystemAbstractions::File authzFile(testVector.substr(0, testVector.length() - 3) + "authz");
+        ASSERT_TRUE(authzFile.Open());
+        SystemAbstractions::File::Buffer authzContents(authzFile.GetSize());
+        ASSERT_EQ(authzFile.GetSize(), authzFile.Read(authzContents));
+        const std::string accessKeyId = "AKIDEXAMPLE";
+        const std::string accessKeySecret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+        EXPECT_EQ(
+            std::string(authzContents.begin(), authzContents.end()),
+            Aws::SignApi::MakeAuthorization(
+                std::string(stsContents.begin(), stsContents.end()),
+                std::string(creqContents.begin(), creqContents.end()),
+                accessKeyId,
+                accessKeySecret
+            )
+        ) << "******** The name of the test vector that failed was: " << GetFileNameOnly(testVector);
+    }
+}
+
+TEST_F(SignApiTests, MakeAuthorizationTestCaseFromDocumentation) {
+    EXPECT_EQ(
+        "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7",
+        Aws::SignApi::MakeAuthorization(
+            (
+                "AWS4-HMAC-SHA256\n"
+                "20150830T123600Z\n"
+                "20150830/us-east-1/iam/aws4_request\n"
+                "f536975d06c0309214f805bb90ccff089219ecd68b2577efef23edd43b7e1a59"
+            ),
+            (
+                "GET\n"
+                "/\n"
+                "Action=ListUsers&Version=2010-05-08\n"
+                "content-type:application/x-www-form-urlencoded; charset=utf-8\n"
+                "host:iam.amazonaws.com\n"
+                "x-amz-date:20150830T123600Z\n"
+                "\n"
+                "content-type;host;x-amz-date\n"
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ),
+            "AKIDEXAMPLE",
+            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"
+        )
+    );
 }

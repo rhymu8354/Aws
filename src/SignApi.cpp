@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <Aws/SignApi.hpp>
+#include <Hash/Hmac.hpp>
 #include <Hash/Sha2.hpp>
 #include <Hash/Templates.hpp>
 #include <Http/Server.hpp>
@@ -17,6 +18,46 @@
 #include <string>
 #include <SystemAbstractions/StringExtensions.hpp>
 #include <vector>
+
+namespace {
+
+    /**
+     * This is the identifier defined by Amazon for the hash algorithm
+     * used to make message digests in this module.
+     */
+    static const char* const HASH_ALGORITHM = "AWS4-HMAC-SHA256";
+
+    /**
+     * This function replaces sequences of two or more spaces with a single
+     * space, to meet the requirement of header values in canonical API
+     * requests, that multiple spaces should be replaced by a single space.
+     *
+     * @param[in] s
+     *     This is the string for which to replace multiple spaces with a
+     *     single space.
+     *
+     * @return
+     *     The given string, with multiple spaces replaced by a single space,
+     *     is returned.
+     */
+    std::string CanonicalizeSpaces(const std::string& s) {
+        std::ostringstream output;
+        bool lastCharWasSpace = false;
+        for (const auto& c: s) {
+            if (c == ' ') {
+                if (!lastCharWasSpace) {
+                    lastCharWasSpace = true;
+                    output << ' ';
+                }
+            } else {
+                output << c;
+                lastCharWasSpace = false;
+            }
+        }
+        return output.str();
+    }
+
+}
 
 namespace Aws {
 
@@ -98,9 +139,7 @@ namespace Aws {
         > headersByName;
         for (const auto& header: request->headers.GetAll()) {
             auto& headerValues = headersByName[SystemAbstractions::ToLower(header.name)];
-            // TODO: remove extra spaces from value (see
-            // https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html).
-            headerValues.push_back(header.value);
+            headerValues.push_back(CanonicalizeSpaces(header.value));
         }
         struct Header {
             std::string name;
@@ -146,6 +185,79 @@ namespace Aws {
 
         // Done.  Return constructed request.
         return canonicalRequest.str();
+    }
+
+    std::string SignApi::MakeStringToSign(
+        const std::string& region,
+        const std::string& service,
+        const std::string& canonicalRequest
+    ) {
+        std::ostringstream output;
+        std::string dateTime;
+        for (const auto& line: SystemAbstractions::Split(canonicalRequest, '\n')) {
+            if (line.substr(0, 11) == "x-amz-date:") {
+                dateTime = line.substr(11);
+                break;
+            }
+        }
+        output
+            << HASH_ALGORITHM << "\n"
+            << dateTime << "\n"
+            << dateTime.substr(0, 8) << "/" << region << "/" << service << "/aws4_request\n"
+            << Hash::StringToString< Hash::Sha256 >(canonicalRequest);
+        return output.str();
+    }
+
+    std::string SignApi::MakeAuthorization(
+        const std::string& stringToSign,
+        const std::string& canonicalRequest,
+        const std::string& accessKeyId,
+        const std::string& accessKeySecret
+    ) {
+        std::ostringstream output;
+        const auto credentialScope = SystemAbstractions::Split(stringToSign, '\n')[2];
+        const auto credentialScopeParts = SystemAbstractions::Split(credentialScope, '/');
+        const auto date = credentialScopeParts[0];
+        const auto region = credentialScopeParts[1];
+        const auto service = credentialScopeParts[2];
+        const auto terminationString = credentialScopeParts[3];
+        const auto hmacRawStringToBytes = Hash::MakeHmacStringToBytesFunction(
+            Hash::StringToBytes< Hash::Sha256 >,
+            Hash::SHA256_BLOCK_SIZE
+        );
+        const auto hmacBytesToBytes = Hash::MakeHmacBytesToBytesFunction(
+            Hash::Sha256,
+            Hash::SHA256_BLOCK_SIZE
+        );
+        const auto hmacBytesToHexString = Hash::MakeHmacBytesToStringFunction(
+            Hash::BytesToString< Hash::Sha256 >,
+            Hash::SHA256_BLOCK_SIZE
+        );
+        const auto signingKey = hmacBytesToBytes(
+            hmacBytesToBytes(
+                hmacBytesToBytes(
+                    hmacRawStringToBytes(
+                        "AWS4" + accessKeySecret,
+                        date
+                    ),
+                    std::vector< uint8_t >(region.begin(), region.end())
+                ),
+                std::vector< uint8_t >(service.begin(), service.end())
+            ),
+            std::vector< uint8_t >(terminationString.begin(), terminationString.end())
+        );
+        const auto signature = hmacBytesToHexString(
+            signingKey,
+            std::vector< uint8_t >(stringToSign.begin(), stringToSign.end())
+        );
+        const auto canonicalRequestLines = SystemAbstractions::Split(canonicalRequest, '\n');
+        const auto signedHeaders = canonicalRequestLines[canonicalRequestLines.size() - 2];
+        output
+            << HASH_ALGORITHM
+            << " Credential=" << accessKeyId << "/" << credentialScope
+            << ", SignedHeaders=" << signedHeaders
+            << ", Signature=" << signature;
+        return output.str();
     }
 
 }
