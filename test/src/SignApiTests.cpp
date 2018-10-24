@@ -65,10 +65,67 @@ struct SignApiTests
         return testVectors;
     }
 
+    static char MakeHexDigit(unsigned int value) {
+        if (value < 10) {
+            return (char)(value + '0');
+        } else {
+            return (char)(value - 10 + 'A');
+        }
+    }
+
+    static std::string PercentEncode(const std::string& input) {
+        std::string output;
+        for (uint8_t c: input) {
+            if ((c >= 0x21) && (c <= 0x7e)) {
+                output.push_back(c);
+            } else {
+                output.push_back('%');
+                output.push_back(MakeHexDigit(c >> 4));
+                output.push_back(MakeHexDigit(c & 0x0F));
+            }
+        }
+        return output;
+    }
+
+    static std::vector< std::string > SplitLines(const std::string& s) {
+        std::vector< std::string > values;
+        auto remainder = s;
+        while (!remainder.empty()) {
+            auto delimiter = remainder.find_first_of('\n');
+            if (delimiter == std::string::npos) {
+                values.push_back(remainder);
+                remainder.clear();
+            } else {
+                values.push_back(remainder.substr(0, delimiter));
+                remainder = remainder.substr(delimiter + 1);
+            }
+        }
+        return values;
+    }
+
     static std::string CleanUpRequest(const std::string& input) {
         std::ostringstream output;
-        for (const auto& line: SystemAbstractions::Split(input, '\n')) {
-            output << line << "\r\n";
+        bool first = true;
+        for (const auto& line: SplitLines(input)) {
+            if (first) {
+                first = false;
+                const auto delimiter1 = line.find(' ');
+                const auto delimiter2 = line.find_last_of(' ');
+                auto rawUri = line.substr(
+                    delimiter1 + 1,
+                    delimiter2 - delimiter1 - 1
+                );
+                if (rawUri.substr(0, 2) == "//") {
+                    rawUri = "/" + rawUri.substr(2);
+                }
+                output
+                    << line.substr(0, delimiter1 + 1)
+                    << PercentEncode(rawUri)
+                    << line.substr(delimiter2)
+                    << "\r\n";
+            } else {
+                output << line << "\r\n";
+            }
         }
         output << "\r\n\r\n";
         return output.str();
