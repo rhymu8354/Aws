@@ -24,7 +24,7 @@ namespace Aws {
          * This function constructs the "canonical request" which corresponds
          * to the given raw API request.  "Canonical request" is as defined by
          * Amazon here:
-         * https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html).
+         * https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html.
          *
          * @param[in] rawRequest
          *     This is the raw API request message.
