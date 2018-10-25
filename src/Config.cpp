@@ -68,7 +68,8 @@ namespace Aws {
                 if (line[line.length() - 1] == ']') {
                     const auto key = SystemAbstractions::Trim(line.substr(1, line.length() - 2));
                     auto* section = &config.Set(key, Json::Object({}));
-                    context.swap(std::stack< Context >());
+                    decltype(context) newContext;
+                    context.swap(newContext);
                     context.push({0, section});
                     lastValue = nullptr;
                 }
