@@ -76,59 +76,61 @@ namespace Aws {
         canonicalRequest << request->method << "\n";
 
         // Step 2
-        Uri::Uri basePath;
-        auto requestPath = basePath.Resolve(request->target);
-        requestPath.ClearQuery();
+        Uri::Uri requestPath;
+        requestPath.SetPath(request->target.GetPath());
+        requestPath.NormalizePath();
         canonicalRequest << requestPath.GenerateString() << "\n";
 
         // Step 3
-        Uri::Uri requestQuery(request->target);
-        requestQuery.SetPath({});
-        auto requestQueryEncoded = requestQuery.GenerateString();
-        if (requestQueryEncoded.length() > 0) {
-            requestQueryEncoded = requestQueryEncoded.substr(1);
-        }
-        auto parametersString = SystemAbstractions::Split(requestQueryEncoded, '&');
-        struct Parameter {
-            std::string name;
-            std::string value;
-        };
-        std::vector< Parameter > parametersVector;
-        for (const auto& parameter: parametersString) {
-            const auto delimiter = parameter.find('=');
-            if (delimiter == std::string::npos) {
-                parametersVector.push_back({parameter, ""});
-            } else {
-                parametersVector.push_back({
-                    parameter.substr(0, delimiter),
-                    parameter.substr(delimiter + 1)
-                });
+        if (request->target.HasQuery()) {
+            Uri::Uri requestQuery;
+            requestQuery.SetQuery(request->target.GetQuery());
+            auto requestQueryEncoded = requestQuery.GenerateString();
+            if (requestQueryEncoded.length() > 0) {
+                requestQueryEncoded = requestQueryEncoded.substr(1);
             }
-        }
-        std::sort(
-            parametersVector.begin(),
-            parametersVector.end(),
-            [](
-                const Parameter& lhs,
-                const Parameter& rhs
-            ) {
-                if (lhs.name < rhs.name) {
-                    return true;
-                } else if (lhs.name > rhs.name) {
-                    return false;
+            auto parametersString = SystemAbstractions::Split(requestQueryEncoded, '&');
+            struct Parameter {
+                std::string name;
+                std::string value;
+            };
+            std::vector< Parameter > parametersVector;
+            for (const auto& parameter: parametersString) {
+                const auto delimiter = parameter.find('=');
+                if (delimiter == std::string::npos) {
+                    parametersVector.push_back({parameter, ""});
                 } else {
-                    return lhs.value < rhs.value;
+                    parametersVector.push_back({
+                        parameter.substr(0, delimiter),
+                        parameter.substr(delimiter + 1)
+                    });
                 }
             }
-        );
-        bool first = true;
-        for (const auto& parameter: parametersVector) {
-            if (first) {
-                first = false;
-            } else {
-                canonicalRequest << '&';
+            std::sort(
+                parametersVector.begin(),
+                parametersVector.end(),
+                [](
+                    const Parameter& lhs,
+                    const Parameter& rhs
+                ) {
+                    if (lhs.name < rhs.name) {
+                        return true;
+                    } else if (lhs.name > rhs.name) {
+                        return false;
+                    } else {
+                        return lhs.value < rhs.value;
+                    }
+                }
+            );
+            bool first = true;
+            for (const auto& parameter: parametersVector) {
+                if (first) {
+                    first = false;
+                } else {
+                    canonicalRequest << '&';
+                }
+                canonicalRequest << parameter.name << '=' << parameter.value;
             }
-            canonicalRequest << parameter.name << '=' << parameter.value;
         }
         canonicalRequest << "\n";
 
@@ -169,7 +171,7 @@ namespace Aws {
         canonicalRequest << "\n";
 
         // Step 5
-        first = true;
+        bool first = true;
         for (const auto& header: headersVector) {
             if (first) {
                 first = false;
