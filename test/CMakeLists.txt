@@ -7,6 +7,7 @@ set(This AwsTests)
 
 set(Sources
     src/SignApiTests.cpp
+    src/ConfigTests.cpp
 )
 
 add_executable(${This} ${Sources})

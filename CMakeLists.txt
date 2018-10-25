@@ -6,10 +6,12 @@ cmake_minimum_required(VERSION 3.8)
 set(This Aws)
 
 set(Headers
+    include/Aws/Config.hpp
     include/Aws/SignApi.hpp
 )
 
 set(Sources
+    src/Config.cpp
     src/SignApi.cpp
 )
 
@@ -23,6 +25,7 @@ target_include_directories(${This} PUBLIC include)
 target_link_libraries(${This} PUBLIC
     Hash
     Http
+    Json
     MessageHeaders
     SystemAbstractions
     Uri

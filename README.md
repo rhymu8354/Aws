@@ -41,6 +41,9 @@ There are two distinct steps in the build process:
 * [Http](https://github.com/rhymu8354/Http.git) - a library which implements
   [RFC 7230](https://tools.ietf.org/html/rfc7230), "Hypertext Transfer Protocol
   (HTTP/1.1): Message Syntax and Routing".
+* [Json](https://github.com/rhymu8354/Json.git) - a library which implements
+  [RFC 7159](https://tools.ietf.org/html/rfc7159), "The JavaScript Object
+  Notation (JSON) Data Interchange Format".
 * [MessageHeaders](https://github.com/rhymu8354/MessageHeaders.git) - a library
   which can parse and generate e-mail or web message headers
 * [SystemAbstractions](https://github.com/rhymu8354/SystemAbstractions.git) - a
