@@ -8,12 +8,37 @@
 
 #include <Aws/Config.hpp>
 #include <stack>
+#include <stdlib.h>
 #include <string>
 #include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/StringExtensions.hpp>
 #include <vector>
 
 namespace {
+
+    /**
+     * This is the default function to use to read environment variables.
+     */
+    const Aws::Config::EnvironmentShim defaultEnvironmentShim = [](const std::string& name) -> std::string {
+        const auto value = getenv(name.c_str());
+        if (value == NULL) {
+            return "";
+        } else {
+            return value;
+        }
+    };
+
+    /**
+     * This is the current function to use to read environment variables.
+     */
+    Aws::Config::EnvironmentShim currentEnvironmentShim = [](const std::string& name) -> std::string {
+        const auto value = getenv(name.c_str());
+        if (value == NULL) {
+            return "";
+        } else {
+            return value;
+        }
+    };
 
     /**
      * This function splits the given string into individual lines, where
@@ -124,6 +149,67 @@ namespace Aws {
                 configFileContents.end()
             )
         );
+    }
+
+    auto Config::GetDefaults(const Json::Value& options) -> Defaults {
+        std::string home = options["home"];
+        std::string profile = options["profile"];
+        if (home.empty()) {
+            home = SystemAbstractions::File::GetUserHomeDirectory();
+        }
+        Defaults defaults;
+        defaults.accessKeyId = currentEnvironmentShim("AWS_ACCESS_KEY_ID");
+        defaults.accessKeyId = currentEnvironmentShim("AWS_SECRET_ACCESS_KEY");
+        defaults.sessionToken = currentEnvironmentShim("AWS_SESSION_TOKEN");
+        defaults.region = currentEnvironmentShim("AWS_DEFAULT_REGION");
+        if (profile.empty()) {
+            profile = currentEnvironmentShim("AWS_PROFILE");
+        }
+        std::string profileConfigSection = "profile " + profile;
+        if (profile.empty()) {
+            profile = "default";
+            profileConfigSection = "default";
+        }
+        auto sharedCredentialsFile = currentEnvironmentShim("AWS_SHARED_CREDENTIALS_FILE");
+        if (sharedCredentialsFile.empty()) {
+            sharedCredentialsFile = home + "/.aws/credentials";
+        }
+        const auto sharedCredentials = FromFile(sharedCredentialsFile)[profile];
+        if (defaults.accessKeyId.empty()) {
+            defaults.accessKeyId = (std::string)sharedCredentials["aws_access_key_id"];
+        }
+        if (defaults.secretAccessKey.empty()) {
+            defaults.secretAccessKey = (std::string)sharedCredentials["aws_secret_access_key"];
+        }
+        if (defaults.sessionToken.empty()) {
+            defaults.sessionToken = (std::string)sharedCredentials["aws_session_token"];
+        }
+        auto configFile = currentEnvironmentShim("AWS_CONFIG_FILE");
+        if (configFile.empty()) {
+            configFile = home + "/.aws/config";
+        }
+        const auto config = FromFile(configFile)[profileConfigSection];
+        if (defaults.accessKeyId.empty()) {
+            defaults.accessKeyId = (std::string)config["aws_access_key_id"];
+        }
+        if (defaults.secretAccessKey.empty()) {
+            defaults.secretAccessKey = (std::string)config["aws_secret_access_key"];
+        }
+        if (defaults.sessionToken.empty()) {
+            defaults.sessionToken = (std::string)config["aws_session_token"];
+        }
+        if (defaults.region.empty()) {
+            defaults.region = (std::string)config["region"];
+        }
+        return defaults;
+    }
+
+    void Config::SetEnvironmentShim(EnvironmentShim environmentShim) {
+        if (environmentShim == nullptr) {
+            currentEnvironmentShim = defaultEnvironmentShim;
+        } else {
+            currentEnvironmentShim = environmentShim;
+        }
     }
 
 }
