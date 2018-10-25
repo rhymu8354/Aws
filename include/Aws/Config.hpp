@@ -30,6 +30,17 @@ namespace Aws {
          *     The parsed AWS configuration is returned.
          */
         static Json::Value FromString(const std::string& configString);
+
+        /**
+         * This function parses an AWS configuration from a file.
+         *
+         * @param[in] configFilePath
+         *     This is the path to the AWS configuration file to parse.
+         *
+         * @return
+         *     The parsed AWS configuration is returned.
+         */
+        static Json::Value FromFile(const std::string& configFilePath);
     };
 
 }

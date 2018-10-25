@@ -9,6 +9,7 @@
 #include <Aws/Config.hpp>
 #include <stack>
 #include <string>
+#include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/StringExtensions.hpp>
 #include <vector>
 
@@ -106,6 +107,23 @@ namespace Aws {
             }
         }
         return config;
+    }
+
+    Json::Value Config::FromFile(const std::string& configFilePath) {
+        SystemAbstractions::File configFile(configFilePath);
+        if (!configFile.Open()) {
+            return nullptr;
+        }
+        SystemAbstractions::File::Buffer configFileContents(configFile.GetSize());
+        if (configFile.Read(configFileContents) != configFile.GetSize()) {
+            return nullptr;
+        }
+        return FromString(
+            std::string(
+                configFileContents.begin(),
+                configFileContents.end()
+            )
+        );
     }
 
 }
