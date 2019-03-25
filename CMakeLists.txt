@@ -7,11 +7,13 @@ set(This Aws)
 
 set(Headers
     include/Aws/Config.hpp
+    include/Aws/S3.hpp
     include/Aws/SignApi.hpp
 )
 
 set(Sources
     src/Config.cpp
+    src/S3.cpp
     src/SignApi.cpp
 )
 

@@ -6,8 +6,9 @@ cmake_minimum_required(VERSION 3.8)
 set(This AwsTests)
 
 set(Sources
-    src/SignApiTests.cpp
     src/ConfigTests.cpp
+    src/SignApiTests.cpp
+    src/S3Tests.cpp
 )
 
 add_executable(${This} ${Sources})
