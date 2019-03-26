@@ -151,13 +151,13 @@ namespace Aws {
         );
     }
 
-    auto Config::GetDefaults(const Json::Value& options) -> Defaults {
+    Config Config::GetDefaults(const Json::Value& options) {
         std::string home = options["home"];
         std::string profile = options["profile"];
         if (home.empty()) {
             home = SystemAbstractions::File::GetUserHomeDirectory();
         }
-        Defaults defaults;
+        Config defaults;
         defaults.accessKeyId = currentEnvironmentShim("AWS_ACCESS_KEY_ID");
         defaults.accessKeyId = currentEnvironmentShim("AWS_SECRET_ACCESS_KEY");
         defaults.sessionToken = currentEnvironmentShim("AWS_SESSION_TOKEN");

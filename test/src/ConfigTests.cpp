@@ -2,7 +2,7 @@
  * @file ConfigTests.cpp
  *
  * This module contains the unit tests of the
- * Aws::Config class.
+ * Aws::Config structure.
  *
  * © 2018 by Richard Walters
  */

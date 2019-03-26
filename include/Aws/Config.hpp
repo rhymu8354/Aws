@@ -16,12 +16,12 @@
 namespace Aws {
 
     /**
-     * This class contains methods used to read and write Amazon Web Services
-     * (AWS) configuration files.
+     * This structure contains Amazon Web Services (AWS) configuration items
+     * and methods used to read them from files.
      */
-    class Config {
+    struct Config {
         // Types
-    public:
+
         /**
          * This is the type of function which can be set up to be called by the
          * Config class whenever it needs to read environment variables.
@@ -34,42 +34,39 @@ namespace Aws {
          */
         typedef std::function< std::string(const std::string& name) > EnvironmentShim;
 
+        // Properties
+
         /**
-         * This is used to return information from the GetDefaults function.
+         * This is part of the AWS access key to use when an access key is
+         * required.  It's the part which is roughly equivalent to the
+         * "user name" part of a user name / password combination.
          */
-        struct Defaults {
-            /**
-             * This is part of the AWS access key to use when an access key is
-             * required.  It's the part which is roughly equivalent to the
-             * "user name" part of a user name / password combination.
-             */
-            std::string accessKeyId;
+        std::string accessKeyId;
 
-            /**
-             * This is part of the AWS access key to use when an access key is
-             * required.  It's the part which is roughly equivalent to the
-             * "password" part of a user name / password combination.
-             */
-            std::string secretAccessKey;
+        /**
+         * This is part of the AWS access key to use when an access key is
+         * required.  It's the part which is roughly equivalent to the
+         * "password" part of a user name / password combination.
+         */
+        std::string secretAccessKey;
 
-            /**
-             * If the AWS access key (to be used when an access key is
-             * required) is a temporary security credential, this is the
-             * additional security token that goes with the key (See
-             * https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys
-             * and
-             * https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
-             */
-            std::string sessionToken;
+        /**
+         * If the AWS access key (to be used when an access key is
+         * required) is a temporary security credential, this is the
+         * additional security token that goes with the key (See
+         * https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys
+         * and
+         * https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
+         */
+        std::string sessionToken;
 
-            /**
-             * This is the AWS region to which to direct API requests.
-             */
-            std::string region;
-        };
+        /**
+         * This is the AWS region to which to direct API requests.
+         */
+        std::string region;
 
-        // Public methods
-    public:
+        // Methods
+
         /**
          * This function parses an AWS configuration from a string.
          *
@@ -109,7 +106,7 @@ namespace Aws {
          *     The default configuration items determined by reading
          *     environment variables and configuration files is returned.
          */
-        static Defaults GetDefaults(const Json::Value& options = Json::Object({}));
+        static Config GetDefaults(const Json::Value& options = Json::Object({}));
 
         /**
          * This function changes the function used by the Config class to read
