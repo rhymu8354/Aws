@@ -71,6 +71,12 @@ namespace {
         };
         for (int mm = 1; mm < months; ++mm) {
             seconds += daysPerMonth[mm - 1] * 86400;
+            if (
+                (mm == 2)
+                && isLeapYear(years)
+            ) {
+                seconds += 86400;
+            }
         }
         seconds += (days - 1) * 86400;
         seconds += hours * 3600;
