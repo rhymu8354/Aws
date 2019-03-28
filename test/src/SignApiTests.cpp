@@ -163,6 +163,29 @@ TEST_F(SignApiTests, MakeCanonicalRequest) {
     }
 }
 
+TEST_F(SignApiTests, AmzUriEncodeQuery) {
+    EXPECT_EQ(
+        std::string(
+            "GET\n"
+            "/\n"
+            "arg=foo%2Bbar%3D\n"
+            "host:example.amazonaws.com\n"
+            "x-amz-date:20150830T123600Z\n"
+            "\n"
+            "host;x-amz-date\n"
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ),
+        Aws::SignApi::ConstructCanonicalRequest(
+            std::string(
+                "GET /?arg=foo+bar= HTTP/1.1\r\n"
+                "Host:example.amazonaws.com\r\n"
+                "X-Amz-Date:20150830T123600Z\r\n"
+                "\r\n"
+            )
+        )
+    );
+}
+
 TEST_F(SignApiTests, MakeStringToSign) {
     static const std::string region = "us-east-1";
     static const std::string service = "service";

@@ -28,6 +28,95 @@ namespace {
     static const char* const HASH_ALGORITHM = "AWS4-HMAC-SHA256";
 
     /**
+     * Breaks the given string at each instance of the given delimiter,
+     * returning the pieces as a collection of substrings.  The delimiter
+     * characters are removed.
+     *
+     * @param[in] s
+     *     This is the string to split.
+     *
+     * @param[in] d
+     *     This is the delimiter character at which to split the string.
+     *
+     * @return
+     *     The collection of substrings that result from breaking the given
+     *     string at each delimiter character is returned.
+     */
+    std::vector< std::string > Split(
+        const std::string& s,
+        char d
+    ) {
+        std::vector< std::string > values;
+        auto remainder = s;
+        while (!remainder.empty()) {
+            auto delimiter = remainder.find_first_of(d);
+            if (delimiter == std::string::npos) {
+                values.push_back(remainder);
+                remainder.clear();
+            } else {
+                values.push_back(remainder.substr(0, delimiter));
+                remainder = remainder.substr(delimiter + 1);
+            }
+        }
+        return values;
+    }
+
+    /**
+     * This function returns the hex digit that corresponds
+     * to the given value.
+     *
+     * @param[in] value
+     *     This is the value to convert to a hex digit.
+     *
+     * @return
+     *     The hex digit corresponding to the given value is returned.
+     */
+    char MakeHexDigit(unsigned int value) {
+        if (value < 10) {
+            return (char)(value + '0');
+        } else {
+            return (char)(value - 10 + 'A');
+        }
+    }
+
+    /**
+     * Encode the given string according to Amazon's strange notion of
+     * what it means to "URI Encode" something (pretty much the same as
+     * the equivalent to the ABNF *(unreserved / pct-encoded) which is
+     * definitely NOT what RFC 3986 says a query string can be, which
+     * is *(pchar / "/" / "?").  But heck, who reads Internet standards
+     * these days, eh?
+     *
+     * @param[in] s
+     *     This is the string to encode.
+     *
+     * @return
+     *     The output of the Amazon brand of "URI Encode" applied
+     *     to the given string is returned.
+     */
+    std::string AmzUriEncode(const std::string& s) {
+        std::string output;
+        for (uint8_t c: s) {
+            if (
+                ((c >= 'A') && (c <= 'Z'))
+                || ((c >= 'a') && (c <= 'z'))
+                || ((c >= '0') && (c <= '9'))
+                || (c == '-')
+                || (c == '_')
+                || (c == '.')
+                || (c == '~')
+            ) {
+                output.push_back(c);
+            } else {
+                output.push_back('%');
+                output.push_back(MakeHexDigit((unsigned int)c >> 4));
+                output.push_back(MakeHexDigit((unsigned int)c & 0x0F));
+            }
+        }
+        return output;
+    }
+
+    /**
      * This function replaces sequences of two or more spaces with a single
      * space, to meet the requirement of header values in canonical API
      * requests, that multiple spaces should be replaced by a single space.
@@ -83,13 +172,8 @@ namespace Aws {
 
         // Step 3
         if (request->target.HasQuery()) {
-            Uri::Uri requestQuery;
-            requestQuery.SetQuery(request->target.GetQuery());
-            auto requestQueryEncoded = requestQuery.GenerateString();
-            if (requestQueryEncoded.length() > 0) {
-                requestQueryEncoded = requestQueryEncoded.substr(1);
-            }
-            auto parametersString = SystemAbstractions::Split(requestQueryEncoded, '&');
+            const auto requestQuery = request->target.GetQuery();
+            const auto parametersString = Split(requestQuery, '&');
             struct Parameter {
                 std::string name;
                 std::string value;
@@ -129,7 +213,7 @@ namespace Aws {
                 } else {
                     canonicalRequest << '&';
                 }
-                canonicalRequest << parameter.name << '=' << parameter.value;
+                canonicalRequest << AmzUriEncode(parameter.name) << '=' << AmzUriEncode(parameter.value);
             }
         }
         canonicalRequest << "\n";
