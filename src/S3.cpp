@@ -253,6 +253,7 @@ namespace Aws {
     auto S3::ListBuckets() -> std::future< ListBucketsResult > {
         auto impl(impl_);
         return std::async(
+            std::launch::async,
             [impl]{
                 ListBucketsResult result;
                 const auto host = "s3." + impl->config.region + ".amazonaws.com";
