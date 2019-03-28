@@ -109,7 +109,7 @@ struct S3Tests
 
 TEST_F(S3Tests, ListBuckets) {
     auto requestFuture = mockClient->request.get_future();
-    auto listBucketsFuture = s3.ListBuckets();
+    auto listObjectsFuture = s3.ListBuckets();
     ASSERT_EQ(
         std::future_status::ready,
         requestFuture.wait_for(std::chrono::milliseconds(100))
@@ -122,7 +122,7 @@ TEST_F(S3Tests, ListBuckets) {
     EXPECT_TRUE(request.headers.HasHeader("x-amz-content-sha256"));
     EXPECT_NE(
         std::future_status::ready,
-        listBucketsFuture.wait_for(std::chrono::seconds(0))
+        listObjectsFuture.wait_for(std::chrono::seconds(0))
     );
     mockClient->transaction->state = Http::IClient::Transaction::State::Completed;
     mockClient->transaction->response.statusCode = 200;
@@ -140,9 +140,9 @@ TEST_F(S3Tests, ListBuckets) {
     mockClient->transaction->Complete();
     ASSERT_EQ(
         std::future_status::ready,
-        listBucketsFuture.wait_for(std::chrono::milliseconds(1000))
+        listObjectsFuture.wait_for(std::chrono::milliseconds(1000))
     );
-    auto listBuckets = listBucketsFuture.get();
+    auto listBuckets = listObjectsFuture.get();
     EXPECT_EQ(200, listBuckets.statusCode);
     EXPECT_EQ("12345", listBuckets.owner.id);
     EXPECT_EQ("alex", listBuckets.owner.displayName);
@@ -151,4 +151,66 @@ TEST_F(S3Tests, ListBuckets) {
     EXPECT_EQ(1517473812.123, listBuckets.buckets[0].creationDate);
     EXPECT_EQ("bar", listBuckets.buckets[1].name);
     EXPECT_EQ(1528457143.456, listBuckets.buckets[1].creationDate);
+}
+
+TEST_F(S3Tests, ListObjects) {
+    auto requestFuture = mockClient->request.get_future();
+    auto listObjectsFuture = s3.ListObjects("my_bucket");
+    ASSERT_EQ(
+        std::future_status::ready,
+        requestFuture.wait_for(std::chrono::milliseconds(100))
+    );
+    auto request = requestFuture.get();
+    EXPECT_EQ("GET", request.method);
+    EXPECT_EQ("//s3.foobar.amazonaws.com:443/my_bucket?list-type=2", request.target.GenerateString());
+    EXPECT_TRUE(request.headers.HasHeader("x-amz-date"));
+    EXPECT_TRUE(request.headers.HasHeader("Authorization"));
+    EXPECT_TRUE(request.headers.HasHeader("x-amz-content-sha256"));
+    EXPECT_NE(
+        std::future_status::ready,
+        listObjectsFuture.wait_for(std::chrono::seconds(0))
+    );
+    mockClient->transaction->state = Http::IClient::Transaction::State::Completed;
+    mockClient->transaction->response.statusCode = 200;
+    mockClient->transaction->response.body = (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">"
+        "<Name>my_bucket</Name>"
+        "<Prefix></Prefix>"
+        "<KeyCount>3</KeyCount>"
+        "<MaxKeys>1000</MaxKeys>"
+        "<IsTruncated>false</IsTruncated>"
+        "<Contents>"
+        "<Key>test1.txt</Key>"
+        "<LastModified>2019-03-03T05:22:16.121Z</LastModified>"
+        "<ETag>&quot;2f1020bd8ec6dcc71b2ee36ad3b577c4&quot;</ETag>"
+        "<Size>156</Size>"
+        "<StorageClass>STANDARD</StorageClass>"
+        "</Contents>"
+        "<Contents>"
+        "<Key>test2.txt</Key>"
+        "<LastModified>2018-01-22T12:08:15.445Z</LastModified>"
+        "<ETag>&quot;2f1020bd8ef6dcc7eb2ee36ad3b577c4&quot;</ETag>"
+        "<Size>317</Size>"
+        "<StorageClass>STANDARD</StorageClass>"
+        "</Contents>"
+        "</ListBucketResult>"
+    );
+    mockClient->transaction->response.state = Http::Response::State::Complete;
+    mockClient->transaction->Complete();
+    ASSERT_EQ(
+        std::future_status::ready,
+        listObjectsFuture.wait_for(std::chrono::milliseconds(1000))
+    );
+    auto listObjects = listObjectsFuture.get();
+    EXPECT_EQ(200, listObjects.statusCode);
+    ASSERT_EQ(2, listObjects.objects.size());
+    EXPECT_EQ("test1.txt", listObjects.objects[0].key);
+    EXPECT_EQ("2f1020bd8ec6dcc71b2ee36ad3b577c4", listObjects.objects[0].eTag);
+    EXPECT_EQ(1551590536.121, listObjects.objects[0].lastModified);
+    EXPECT_EQ(156, listObjects.objects[0].size);
+    EXPECT_EQ("test2.txt", listObjects.objects[1].key);
+    EXPECT_EQ("2f1020bd8ef6dcc7eb2ee36ad3b577c4", listObjects.objects[1].eTag);
+    EXPECT_EQ(1516622895.445, listObjects.objects[1].lastModified);
+    EXPECT_EQ(317, listObjects.objects[1].size);
 }

@@ -13,6 +13,7 @@
 #include <set>
 #include <stack>
 #include <stdio.h>
+#include <SystemAbstractions/StringExtensions.hpp>
 #include <time.h>
 
 namespace {
@@ -117,7 +118,6 @@ namespace {
         } state = State::Header;
         std::string data;
         std::stack< Json::Value* > elements;
-        std::stack< bool > isArray;
         for (auto c: xml) {
             switch (state) {
                 case State::Header: {
@@ -149,24 +149,21 @@ namespace {
                             ? json
                             : *elements.top()
                         );
-                        if (
-                            !isArray.empty()
-                            && isArray.top()
-                        ) {
-                            if (parent.GetType() != Json::Value::Type::Array) {
-                                parent = Json::Array({});
-                            }
-                            parent.Add(Json::Value());
-                            auto& child = parent[parent.GetSize() - 1];
-                            elements.push(&child);
-                        } else {
-                            if (parent.GetType() != Json::Value::Type::Object) {
-                                parent = Json::Object({});
-                            }
+                        if (parent.GetType() != Json::Value::Type::Object) {
+                            parent = Json::Object({});
+                        }
+                        if (arrayElements.find(data) == arrayElements.end()) {
                             auto& child = parent[data];
                             elements.push(&child);
+                        } else {
+                            if (parent[data].GetType() != Json::Value::Type::Array) {
+                                parent[data] = Json::Array({});
+                            }
+                            auto& child = parent[data];
+                            child.Add(Json::Value());
+                            auto& element = child[child.GetSize() - 1];
+                            elements.push(&element);
                         }
-                        isArray.push(arrayElements.find(data) != arrayElements.end());
                         data.clear();
                     } else {
                         data += c;
@@ -202,7 +199,6 @@ namespace {
                             state = State::End;
                         } else {
                             elements.pop();
-                            isArray.pop();
                             state = State::TagBegin;
                         }
                     }
@@ -290,20 +286,27 @@ namespace Aws {
                 result.transactionState = transaction->state;
                 result.statusCode = transaction->response.statusCode;
                 if (transaction->state == Http::IClient::Transaction::State::Completed) {
-                    const auto parsedBody = XmlToJson(
-                        transaction->response.body,
-                        std::set< std::string >({"Buckets"})
-                    );
-                    result.owner.id = parsedBody["Owner"]["ID"];
-                    result.owner.displayName = parsedBody["Owner"]["DisplayName"];
-                    const auto& buckets = parsedBody["Buckets"];
-                    const auto numBuckets = buckets.GetSize();
-                    for (size_t i = 0; i < numBuckets; ++i) {
-                        const auto& bucketJson = buckets[i];
-                        Bucket bucket;
-                        bucket.name = bucketJson["Name"];
-                        bucket.creationDate = ParseTimestamp(bucketJson["CreationDate"]);
-                        result.buckets.push_back(std::move(bucket));
+                    if (transaction->response.statusCode == 200) {
+                        const auto parsedBody = XmlToJson(
+                            transaction->response.body,
+                            std::set< std::string >({"Bucket"})
+                        );
+                        result.owner.id = parsedBody["Owner"]["ID"];
+                        result.owner.displayName = parsedBody["Owner"]["DisplayName"];
+                        const auto& buckets = parsedBody["Buckets"]["Bucket"];
+                        const auto numBuckets = buckets.GetSize();
+                        for (size_t i = 0; i < numBuckets; ++i) {
+                            const auto& bucketJson = buckets[i];
+                            Bucket bucket;
+                            bucket.name = bucketJson["Name"];
+                            bucket.creationDate = ParseTimestamp(bucketJson["CreationDate"]);
+                            result.buckets.push_back(std::move(bucket));
+                        }
+                    } else {
+                        result.errorInfo = XmlToJson(
+                            transaction->response.body,
+                            std::set< std::string >({})
+                        );
                     }
                 }
                 return result;
@@ -311,4 +314,92 @@ namespace Aws {
         );
     }
 
+    auto S3::ListObjects(const std::string& bucketName) -> std::future< ListObjectsResult > {
+        auto impl(impl_);
+        return std::async(
+            std::launch::async,
+            [impl, bucketName]{
+                ListObjectsResult result;
+                const auto host = "s3." + impl->config.region + ".amazonaws.com";
+                const auto date = AmzTimestamp(time(NULL));
+                std::string continuationToken;
+                do {
+                    Http::Request request;
+                    request.method = "GET";
+                    request.target.SetHost(host);
+                    request.target.SetPort(443);
+                    request.target.SetPath({"", bucketName});
+                    std::vector< std::string > queryParts = {"list-type=2"};
+                    if (!continuationToken.empty()) {
+                        queryParts.push_back("continuation-token=" + continuationToken);
+                    }
+                    request.target.SetQuery(SystemAbstractions::Join(queryParts, "&"));
+                    request.headers.AddHeader("Host", host);
+                    request.headers.AddHeader("x-amz-date", date);
+                    const auto canonicalRequest = SignApi::ConstructCanonicalRequest(request.Generate());
+                    const auto payloadHashOffset = canonicalRequest.find_last_of('\n') + 1;
+                    const auto payloadHash = canonicalRequest.substr(payloadHashOffset);
+                    const auto stringToSign = SignApi::MakeStringToSign(
+                        impl->config.region,
+                        "s3",
+                        canonicalRequest
+                    );
+                    const auto authorization = SignApi::MakeAuthorization(
+                        stringToSign,
+                        canonicalRequest,
+                        impl->config.accessKeyId,
+                        impl->config.secretAccessKey
+                    );
+                    request.headers.AddHeader("Authorization", authorization);
+                    request.headers.AddHeader("x-amz-content-sha256", payloadHash);
+                    if (!impl->config.sessionToken.empty()) {
+                        request.headers.AddHeader("x-amz-security-token", impl->config.sessionToken);
+                    }
+                    const auto rawRequest = request.Generate();
+                    const auto transaction = impl->http->Request(request);
+                    transaction->AwaitCompletion();
+                    result.transactionState = transaction->state;
+                    result.statusCode = transaction->response.statusCode;
+                    if (transaction->state == Http::IClient::Transaction::State::Completed) {
+                        if (transaction->response.statusCode == 200) {
+                            const auto parsedBody = XmlToJson(
+                                transaction->response.body,
+                                std::set< std::string >({"Contents"})
+                            );
+                            const auto& parsedObjects = parsedBody["Contents"];
+                            const auto numObjects = parsedObjects.GetSize();
+                            for (size_t i = 0; i < numObjects; ++i) {
+                                const auto& parsedObject = parsedObjects[i];
+                                Object object;
+                                object.key = parsedObject["Key"];
+                                object.lastModified = ParseTimestamp(parsedObject["LastModified"]);
+                                object.eTag = parsedObject["ETag"];
+                                object.eTag = object.eTag.substr(6, object.eTag.size() - 12);
+                                (void)sscanf(
+                                    ((std::string)parsedObject["Size"]).c_str(),
+                                    "%zu",
+                                    &object.size
+                                );
+                                result.objects.push_back(std::move(object));
+                            }
+                            if ((std::string)parsedBody["IsTruncated"] == "true") {
+                                continuationToken = parsedBody["NextContinuationToken"];
+                            } else {
+                                continuationToken.clear();
+                            }
+                        } else {
+                            result.errorInfo = XmlToJson(
+                                transaction->response.body,
+                                std::set< std::string >({})
+                            );
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                } while (!continuationToken.empty());
+                return result;
+            }
+        );
+    }
 }

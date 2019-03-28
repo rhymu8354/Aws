@@ -57,23 +57,48 @@ namespace Aws {
         };
 
         /**
+         * This contains information about an object in an S3 bucket.
+         */
+        struct Object {
+            /**
+             * This is the key of the object.
+             */
+            std::string key;
+
+            /**
+             * This is the entity tag of the object.
+             */
+            std::string eTag;
+
+            /**
+             * This is the time, in seconds past the UNIX epoch (midnight UTC,
+             * January 1, 1970), when the object was last modified.
+             */
+            double lastModified = 0.0;
+
+            /**
+             * This is the size of the object in bytes.
+             */
+            size_t size = 0;
+        };
+
+        /**
          * This holds the information returned by the S3 ListBuckets API.
          */
         struct ListBucketsResult {
             /**
-             * This is where the final state of the transaction made to list
-             * the buckets is stored.
+             * This is where the final state of the transaction for the last
+             * request made to S3.
              */
             Http::IClient::Transaction::State transactionState = Http::IClient::Transaction::State::InProgress;
 
             /**
-             * This is the HTTP status code from the request made to list the
-             * buckets.
+             * This is the HTTP status code from the last request made to S3.
              */
             unsigned int statusCode = 0;
 
             /**
-             * This describes the owner of an S3 bucket.
+             * This describes the owner of the S3 buckets.
              */
             Owner owner;
 
@@ -81,6 +106,39 @@ namespace Aws {
              * This contains information about the S3 buckets listed.
              */
             std::vector< Bucket > buckets;
+
+            /**
+             * If the request was not completely successful, this is a copy
+             * of the error information provided in the last response.
+             */
+            Json::Value errorInfo;
+        };
+
+        /**
+         * This holds the information returned by the S3 ListObjects API.
+         */
+        struct ListObjectsResult {
+            /**
+             * This is where the final state of the transaction for the last
+             * request made to S3.
+             */
+            Http::IClient::Transaction::State transactionState = Http::IClient::Transaction::State::InProgress;
+
+            /**
+             * This is the HTTP status code from the last request made to S3.
+             */
+            unsigned int statusCode = 0;
+
+            /**
+             * This contains information about the objects in the S3 bucket.
+             */
+            std::vector< Object > objects;
+
+            /**
+             * If the request was not completely successful, this is a copy
+             * of the error information provided in the last response.
+             */
+            Json::Value errorInfo;
         };
 
         // Lifecycle management
@@ -120,6 +178,18 @@ namespace Aws {
          *     S3 request.
          */
         std::future< ListBucketsResult > ListBuckets();
+
+        /**
+         * Retrieve the list of the objects in the given S3 bucket.
+         *
+         * @param[in] bucketName
+         *     This is the name of the bucket whose objects should be listed.
+         *
+         * @return
+         *     A future is returned which will return the results of the
+         *     S3 request.
+         */
+        std::future< ListObjectsResult > ListObjects(const std::string& bucketName);
 
         // Private properties
     private:
