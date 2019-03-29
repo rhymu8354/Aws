@@ -13,6 +13,7 @@
 #include <set>
 #include <stack>
 #include <stdio.h>
+#include <string>
 #include <SystemAbstractions/StringExtensions.hpp>
 #include <time.h>
 
@@ -137,7 +138,7 @@ namespace {
      */
     Json::Value XmlToJson(
         const std::string& xml,
-        std::set< std::string >& arrayElements
+        const std::set< std::string >& arrayElements
     ) {
         auto json = Json::Object({});
         enum class State {
@@ -325,14 +326,14 @@ namespace Aws {
                             transaction->response.body,
                             std::set< std::string >({"Bucket"})
                         );
-                        result.owner.id = parsedBody["Owner"]["ID"];
-                        result.owner.displayName = parsedBody["Owner"]["DisplayName"];
+                        result.owner.id = (std::string)parsedBody["Owner"]["ID"];
+                        result.owner.displayName = (std::string)parsedBody["Owner"]["DisplayName"];
                         const auto& buckets = parsedBody["Buckets"]["Bucket"];
                         const auto numBuckets = buckets.GetSize();
                         for (size_t i = 0; i < numBuckets; ++i) {
                             const auto& bucketJson = buckets[i];
                             Bucket bucket;
-                            bucket.name = bucketJson["Name"];
+                            bucket.name = (std::string)bucketJson["Name"];
                             bucket.creationDate = ParseTimestamp(bucketJson["CreationDate"]);
                             result.buckets.push_back(std::move(bucket));
                         }
@@ -405,9 +406,9 @@ namespace Aws {
                             for (size_t i = 0; i < numObjects; ++i) {
                                 const auto& parsedObject = parsedObjects[i];
                                 Object object;
-                                object.key = parsedObject["Key"];
+                                object.key = (std::string)parsedObject["Key"];
                                 object.lastModified = ParseTimestamp(parsedObject["LastModified"]);
-                                object.eTag = parsedObject["ETag"];
+                                object.eTag = (std::string)parsedObject["ETag"];
                                 object.eTag = object.eTag.substr(6, object.eTag.size() - 12);
                                 (void)sscanf(
                                     ((std::string)parsedObject["Size"]).c_str(),
@@ -417,7 +418,7 @@ namespace Aws {
                                 result.objects.push_back(std::move(object));
                             }
                             if ((std::string)parsedBody["IsTruncated"] == "true") {
-                                continuationToken = parsedBody["NextContinuationToken"];
+                                continuationToken = (std::string)parsedBody["NextContinuationToken"];
                             } else {
                                 continuationToken.clear();
                             }
