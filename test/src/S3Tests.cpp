@@ -214,3 +214,38 @@ TEST_F(S3Tests, ListObjects) {
     EXPECT_EQ(1516622895.445, listObjects.objects[1].lastModified);
     EXPECT_EQ(317, listObjects.objects[1].size);
 }
+
+TEST_F(S3Tests, GetObject) {
+    auto requestFuture = mockClient->request.get_future();
+    auto getObjectFuture = s3.GetObject("my_bucket", "my_object");
+    ASSERT_EQ(
+        std::future_status::ready,
+        requestFuture.wait_for(std::chrono::milliseconds(100))
+    );
+    auto request = requestFuture.get();
+    EXPECT_EQ("GET", request.method);
+    EXPECT_EQ("//s3.foobar.amazonaws.com:443/my_bucket/my_object", request.target.GenerateString());
+    EXPECT_TRUE(request.headers.HasHeader("x-amz-date"));
+    EXPECT_TRUE(request.headers.HasHeader("Authorization"));
+    EXPECT_TRUE(request.headers.HasHeader("x-amz-content-sha256"));
+    EXPECT_NE(
+        std::future_status::ready,
+        getObjectFuture.wait_for(std::chrono::seconds(0))
+    );
+    mockClient->transaction->state = Http::IClient::Transaction::State::Completed;
+    mockClient->transaction->response.statusCode = 200;
+    mockClient->transaction->response.headers.AddHeader("Content-Type", "text/plain");
+    mockClient->transaction->response.headers.AddHeader("Cache-Control", "max-age=0");
+    mockClient->transaction->response.body = "PogChamp";
+    mockClient->transaction->response.state = Http::Response::State::Complete;
+    mockClient->transaction->Complete();
+    ASSERT_EQ(
+        std::future_status::ready,
+        getObjectFuture.wait_for(std::chrono::milliseconds(1000))
+    );
+    auto getObject = getObjectFuture.get();
+    EXPECT_EQ(200, getObject.statusCode);
+    EXPECT_EQ("PogChamp", getObject.content);
+    EXPECT_EQ("text/plain", getObject.headers.GetHeaderValue("Content-Type"));
+    EXPECT_EQ("max-age=0", getObject.headers.GetHeaderValue("Cache-Control"));
+}

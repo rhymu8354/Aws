@@ -36,6 +36,40 @@ namespace {
     }
 
     /**
+     * Breaks the given string at each instance of the given delimiter,
+     * returning the pieces as a collection of substrings.  The delimiter
+     * characters are removed.
+     *
+     * @param[in] s
+     *     This is the string to split.
+     *
+     * @param[in] d
+     *     This is the delimiter character at which to split the string.
+     *
+     * @return
+     *     The collection of substrings that result from breaking the given
+     *     string at each delimiter character is returned.
+     */
+    std::vector< std::string > Split(
+        const std::string& s,
+        char d
+    ) {
+        std::vector< std::string > values;
+        auto remainder = s;
+        while (!remainder.empty()) {
+            auto delimiter = remainder.find_first_of(d);
+            if (delimiter == std::string::npos) {
+                values.push_back(remainder);
+                remainder.clear();
+            } else {
+                values.push_back(remainder.substr(0, delimiter));
+                remainder = remainder.substr(delimiter + 1);
+            }
+        }
+        return values;
+    }
+
+    /**
      * Convert the given time in UTC to the equivalent number of seconds
      * since the UNIX epoch (Midnight UTC January 1, 1970).
      *
@@ -402,4 +436,65 @@ namespace Aws {
             }
         );
     }
+
+    auto S3::GetObject(
+        const std::string& bucketName,
+        const std::string& objectName
+    ) -> std::future< GetObjectResult > {
+        auto impl(impl_);
+        return std::async(
+            std::launch::async,
+            [impl, bucketName, objectName]{
+                GetObjectResult result;
+                const auto host = "s3." + impl->config.region + ".amazonaws.com";
+                const auto date = AmzTimestamp(time(NULL));
+                Http::Request request;
+                request.method = "GET";
+                request.target.SetHost(host);
+                request.target.SetPort(443);
+                auto objectNameParts = Split(objectName, '/');
+                objectNameParts.insert(objectNameParts.begin(), {"", bucketName});
+                request.target.SetPath(objectNameParts);
+                request.headers.AddHeader("Host", host);
+                request.headers.AddHeader("x-amz-date", date);
+                const auto canonicalRequest = SignApi::ConstructCanonicalRequest(request.Generate());
+                const auto payloadHashOffset = canonicalRequest.find_last_of('\n') + 1;
+                const auto payloadHash = canonicalRequest.substr(payloadHashOffset);
+                const auto stringToSign = SignApi::MakeStringToSign(
+                    impl->config.region,
+                    "s3",
+                    canonicalRequest
+                );
+                const auto authorization = SignApi::MakeAuthorization(
+                    stringToSign,
+                    canonicalRequest,
+                    impl->config.accessKeyId,
+                    impl->config.secretAccessKey
+                );
+                request.headers.AddHeader("Authorization", authorization);
+                request.headers.AddHeader("x-amz-content-sha256", payloadHash);
+                if (!impl->config.sessionToken.empty()) {
+                    request.headers.AddHeader("x-amz-security-token", impl->config.sessionToken);
+                }
+                const auto rawRequest = request.Generate();
+                const auto transaction = impl->http->Request(request);
+                transaction->AwaitCompletion();
+                result.transactionState = transaction->state;
+                result.statusCode = transaction->response.statusCode;
+                result.headers = transaction->response.headers;
+                if (transaction->state == Http::IClient::Transaction::State::Completed) {
+                    if (transaction->response.statusCode == 200) {
+                        result.content = transaction->response.body;
+                    } else {
+                        result.errorInfo = XmlToJson(
+                            transaction->response.body,
+                            std::set< std::string >({})
+                        );
+                    }
+                }
+                return result;
+            }
+        );
+    }
+
 }

@@ -12,6 +12,7 @@
 
 #include <future>
 #include <Http/IClient.hpp>
+#include <MessageHeaders/MessageHeaders.hpp>
 #include <string>
 #include <vector>
 
@@ -141,6 +142,40 @@ namespace Aws {
             Json::Value errorInfo;
         };
 
+        /**
+         * This holds the information returned by the S3 GetObject API.
+         */
+        struct GetObjectResult {
+            /**
+             * This is where the final state of the transaction for the last
+             * request made to S3.
+             */
+            Http::IClient::Transaction::State transactionState = Http::IClient::Transaction::State::InProgress;
+
+            /**
+             * This is the HTTP status code from the last request made to S3.
+             */
+            unsigned int statusCode = 0;
+
+            /**
+             * This contains the content of the object in the S3 bucket.
+             */
+            std::string content;
+
+            /**
+             * This contains a copy of the headers provided from the S3
+             * response, which contains metadata and other information
+             * about the object and its retrieval.
+             */
+            MessageHeaders::MessageHeaders headers;
+
+            /**
+             * If the request was not completely successful, this is a copy
+             * of the error information provided in the last response.
+             */
+            Json::Value errorInfo;
+        };
+
         // Lifecycle management
     public:
         ~S3() noexcept;
@@ -190,6 +225,24 @@ namespace Aws {
          *     S3 request.
          */
         std::future< ListObjectsResult > ListObjects(const std::string& bucketName);
+
+        /**
+         * Retrieve the contents of an object in the given S3 bucket.
+         *
+         * @param[in] bucketName
+         *     This is the name of the bucket containing the object.
+         *
+         * @param[in] objectName
+         *     This is the name of the object to retrieve.
+         *
+         * @return
+         *     A future is returned which will return the results of the
+         *     S3 request.
+         */
+        std::future< GetObjectResult > GetObject(
+            const std::string& bucketName,
+            const std::string& objectName
+        );
 
         // Private properties
     private:
