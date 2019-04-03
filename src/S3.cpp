@@ -498,4 +498,72 @@ namespace Aws {
         );
     }
 
+    auto S3::PutObject(
+        const std::string& bucketName,
+        const std::string& objectName,
+        const std::string& contents,
+        const std::map< std::string, std::string > extraHeaders
+    ) -> std::future< PutObjectResult > {
+        auto impl(impl_);
+        return std::async(
+            std::launch::async,
+            [impl, bucketName, objectName, contents, extraHeaders]{
+                PutObjectResult result;
+                const auto host = "s3." + impl->config.region + ".amazonaws.com";
+                const auto date = AmzTimestamp(time(NULL));
+                Http::Request request;
+                request.method = "PUT";
+                request.target.SetHost(host);
+                request.target.SetPort(443);
+                auto objectNameParts = Split(objectName, '/');
+                objectNameParts.insert(objectNameParts.begin(), {"", bucketName});
+                request.target.SetPath(objectNameParts);
+                request.headers.AddHeader("Host", host);
+                request.headers.AddHeader("x-amz-date", date);
+                for (const auto& extraHeader: extraHeaders) {
+                    request.headers.AddHeader(extraHeader.first, extraHeader.second);
+                }
+                request.headers.SetHeader(
+                    "Content-Length",
+                    SystemAbstractions::sprintf("%zu", contents.length())
+                );
+                request.body = contents;
+                const auto canonicalRequest = SignApi::ConstructCanonicalRequest(request.Generate());
+                const auto payloadHashOffset = canonicalRequest.find_last_of('\n') + 1;
+                const auto payloadHash = canonicalRequest.substr(payloadHashOffset);
+                const auto stringToSign = SignApi::MakeStringToSign(
+                    impl->config.region,
+                    "s3",
+                    canonicalRequest
+                );
+                const auto authorization = SignApi::MakeAuthorization(
+                    stringToSign,
+                    canonicalRequest,
+                    impl->config.accessKeyId,
+                    impl->config.secretAccessKey
+                );
+                request.headers.AddHeader("Authorization", authorization);
+                request.headers.AddHeader("x-amz-content-sha256", payloadHash);
+                if (!impl->config.sessionToken.empty()) {
+                    request.headers.AddHeader("x-amz-security-token", impl->config.sessionToken);
+                }
+                const auto rawRequest = request.Generate();
+                const auto transaction = impl->http->Request(request);
+                transaction->AwaitCompletion();
+                result.transactionState = transaction->state;
+                result.statusCode = transaction->response.statusCode;
+                result.headers = transaction->response.headers;
+                if (transaction->state == Http::IClient::Transaction::State::Completed) {
+                    if (transaction->response.statusCode != 200) {
+                        result.errorInfo = XmlToJson(
+                            transaction->response.body,
+                            std::set< std::string >({})
+                        );
+                    }
+                }
+                return result;
+            }
+        );
+    }
+
 }
