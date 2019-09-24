@@ -78,7 +78,7 @@ namespace {
      *     This is the timestamp to convert.
      *
      * @return
-     *     The equivalent timetamp in seconds since the UNIX epoch
+     *     The equivalent timestamp in seconds since the UNIX epoch
      *     is returned.
      */
     double ParseTimestamp(const std::string& timestamp) {
