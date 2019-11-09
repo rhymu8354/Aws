@@ -29,6 +29,7 @@ target_link_libraries(${This} PUBLIC
     Http
     Json
     MessageHeaders
+    StringExtensions
     SystemAbstractions
     Uri
 )

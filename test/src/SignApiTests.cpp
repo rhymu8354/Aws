@@ -12,7 +12,6 @@
 #include <set>
 #include <sstream>
 #include <SystemAbstractions/File.hpp>
-#include <SystemAbstractions/StringExtensions.hpp>
 
 #define STRINGIFY(s) #s
 #define STRINGIFY_DEFINE_VALUE(s) STRINGIFY(s)

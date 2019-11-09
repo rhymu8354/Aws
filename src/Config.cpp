@@ -10,8 +10,8 @@
 #include <stack>
 #include <stdlib.h>
 #include <string>
+#include <StringExtensions/StringExtensions.hpp>
 #include <SystemAbstractions/File.hpp>
-#include <SystemAbstractions/StringExtensions.hpp>
 #include <vector>
 
 namespace {
@@ -91,7 +91,7 @@ namespace Aws {
             }
             if (line[0] == '[') {
                 if (line[line.length() - 1] == ']') {
-                    const auto key = SystemAbstractions::Trim(line.substr(1, line.length() - 2));
+                    const auto key = StringExtensions::Trim(line.substr(1, line.length() - 2));
                     auto* section = &config.Set(key, Json::Object({}));
                     context = decltype(context)();
                     context.push({0, section});
@@ -123,8 +123,8 @@ namespace Aws {
             if (delimiter == std::string::npos) {
                 continue;
             }
-            const auto key = SystemAbstractions::Trim(line.substr(0, delimiter));
-            const auto value = SystemAbstractions::Trim(line.substr(delimiter + 1));
+            const auto key = StringExtensions::Trim(line.substr(0, delimiter));
+            const auto value = StringExtensions::Trim(line.substr(delimiter + 1));
             if (value.empty()) {
                 lastValue = &context.top().value->Set(key, Json::Object({}));
             } else {

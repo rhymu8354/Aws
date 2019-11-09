@@ -16,7 +16,7 @@
 #include <MessageHeaders/MessageHeaders.hpp>
 #include <sstream>
 #include <string>
-#include <SystemAbstractions/StringExtensions.hpp>
+#include <StringExtensions/StringExtensions.hpp>
 #include <vector>
 
 namespace {
@@ -224,7 +224,7 @@ namespace Aws {
             std::vector< std::string >
         > headersByName;
         for (const auto& header: request->headers.GetAll()) {
-            auto& headerValues = headersByName[SystemAbstractions::ToLower(header.name)];
+            auto& headerValues = headersByName[StringExtensions::ToLower(header.name)];
             headerValues.push_back(CanonicalizeSpaces(header.value));
         }
         struct Header {
@@ -250,7 +250,7 @@ namespace Aws {
             }
         );
         for (const auto& header: headersVector) {
-            canonicalRequest << header.name << ':' << SystemAbstractions::Join(header.values, ",") << "\n";
+            canonicalRequest << header.name << ':' << StringExtensions::Join(header.values, ",") << "\n";
         }
         canonicalRequest << "\n";
 
@@ -280,7 +280,7 @@ namespace Aws {
     ) {
         std::ostringstream output;
         std::string dateTime;
-        for (const auto& line: SystemAbstractions::Split(canonicalRequest, '\n')) {
+        for (const auto& line: StringExtensions::Split(canonicalRequest, '\n')) {
             if (line.substr(0, 11) == "x-amz-date:") {
                 dateTime = line.substr(11);
                 break;
@@ -301,8 +301,8 @@ namespace Aws {
         const std::string& accessKeySecret
     ) {
         std::ostringstream output;
-        const auto credentialScope = SystemAbstractions::Split(stringToSign, '\n')[2];
-        const auto credentialScopeParts = SystemAbstractions::Split(credentialScope, '/');
+        const auto credentialScope = StringExtensions::Split(stringToSign, '\n')[2];
+        const auto credentialScopeParts = StringExtensions::Split(credentialScope, '/');
         const auto date = credentialScopeParts[0];
         const auto region = credentialScopeParts[1];
         const auto service = credentialScopeParts[2];
@@ -336,7 +336,7 @@ namespace Aws {
             signingKey,
             std::vector< uint8_t >(stringToSign.begin(), stringToSign.end())
         );
-        const auto canonicalRequestLines = SystemAbstractions::Split(canonicalRequest, '\n');
+        const auto canonicalRequestLines = StringExtensions::Split(canonicalRequest, '\n');
         const auto signedHeaders = canonicalRequestLines[canonicalRequestLines.size() - 2];
         output
             << HASH_ALGORITHM

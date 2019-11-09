@@ -14,7 +14,7 @@
 #include <stack>
 #include <stdio.h>
 #include <string>
-#include <SystemAbstractions/StringExtensions.hpp>
+#include <StringExtensions/StringExtensions.hpp>
 #include <time.h>
 
 namespace {
@@ -368,7 +368,7 @@ namespace Aws {
                     if (!continuationToken.empty()) {
                         queryParts.push_back("continuation-token=" + continuationToken);
                     }
-                    request.target.SetQuery(SystemAbstractions::Join(queryParts, "&"));
+                    request.target.SetQuery(StringExtensions::Join(queryParts, "&"));
                     request.headers.AddHeader("Host", host);
                     request.headers.AddHeader("x-amz-date", date);
                     const auto canonicalRequest = SignApi::ConstructCanonicalRequest(request.Generate());
@@ -525,7 +525,7 @@ namespace Aws {
                 }
                 request.headers.SetHeader(
                     "Content-Length",
-                    SystemAbstractions::sprintf("%zu", contents.length())
+                    StringExtensions::sprintf("%zu", contents.length())
                 );
                 request.body = contents;
                 const auto canonicalRequest = SignApi::ConstructCanonicalRequest(request.Generate());
