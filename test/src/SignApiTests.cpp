@@ -144,11 +144,11 @@ const std::set< std::string > SignApiTests::testVectors = SignApiTests::FindTest
 TEST_F(SignApiTests, MakeCanonicalRequest) {
     for (const auto& testVector: testVectors) {
         SystemAbstractions::File testVectorFile(testVector);
-        ASSERT_TRUE(testVectorFile.Open());
+        ASSERT_TRUE(testVectorFile.OpenReadOnly());
         SystemAbstractions::File::Buffer testVectorContents(testVectorFile.GetSize());
         ASSERT_EQ(testVectorFile.GetSize(), testVectorFile.Read(testVectorContents));
         SystemAbstractions::File creqFile(testVector.substr(0, testVector.length() - 3) + "creq");
-        ASSERT_TRUE(creqFile.Open());
+        ASSERT_TRUE(creqFile.OpenReadOnly());
         SystemAbstractions::File::Buffer creqContents(creqFile.GetSize());
         ASSERT_EQ(creqFile.GetSize(), creqFile.Read(creqContents));
         EXPECT_EQ(
@@ -190,11 +190,11 @@ TEST_F(SignApiTests, MakeStringToSign) {
     static const std::string service = "service";
     for (const auto& testVector: testVectors) {
         SystemAbstractions::File creqFile(testVector.substr(0, testVector.length() - 3) + "creq");
-        ASSERT_TRUE(creqFile.Open());
+        ASSERT_TRUE(creqFile.OpenReadOnly());
         SystemAbstractions::File::Buffer creqContents(creqFile.GetSize());
         ASSERT_EQ(creqFile.GetSize(), creqFile.Read(creqContents));
         SystemAbstractions::File stsFile(testVector.substr(0, testVector.length() - 3) + "sts");
-        ASSERT_TRUE(stsFile.Open());
+        ASSERT_TRUE(stsFile.OpenReadOnly());
         SystemAbstractions::File::Buffer stsContents(stsFile.GetSize());
         ASSERT_EQ(stsFile.GetSize(), stsFile.Read(stsContents));
         EXPECT_EQ(
@@ -211,15 +211,15 @@ TEST_F(SignApiTests, MakeStringToSign) {
 TEST_F(SignApiTests, MakeAuthorization) {
     for (const auto& testVector: testVectors) {
         SystemAbstractions::File creqFile(testVector.substr(0, testVector.length() - 3) + "creq");
-        ASSERT_TRUE(creqFile.Open());
+        ASSERT_TRUE(creqFile.OpenReadOnly());
         SystemAbstractions::File::Buffer creqContents(creqFile.GetSize());
         ASSERT_EQ(creqFile.GetSize(), creqFile.Read(creqContents));
         SystemAbstractions::File stsFile(testVector.substr(0, testVector.length() - 3) + "sts");
-        ASSERT_TRUE(stsFile.Open());
+        ASSERT_TRUE(stsFile.OpenReadOnly());
         SystemAbstractions::File::Buffer stsContents(stsFile.GetSize());
         ASSERT_EQ(stsFile.GetSize(), stsFile.Read(stsContents));
         SystemAbstractions::File authzFile(testVector.substr(0, testVector.length() - 3) + "authz");
-        ASSERT_TRUE(authzFile.Open());
+        ASSERT_TRUE(authzFile.OpenReadOnly());
         SystemAbstractions::File::Buffer authzContents(authzFile.GetSize());
         ASSERT_EQ(authzFile.GetSize(), authzFile.Read(authzContents));
         const std::string accessKeyId = "AKIDEXAMPLE";

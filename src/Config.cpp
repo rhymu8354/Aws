@@ -136,7 +136,7 @@ namespace Aws {
 
     Json::Value Config::FromFile(const std::string& configFilePath) {
         SystemAbstractions::File configFile(configFilePath);
-        if (!configFile.Open()) {
+        if (!configFile.OpenReadOnly()) {
             return nullptr;
         }
         SystemAbstractions::File::Buffer configFileContents(configFile.GetSize());
